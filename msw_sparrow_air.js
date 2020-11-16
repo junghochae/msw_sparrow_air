@@ -120,7 +120,8 @@ function git_pull(mlib_name, directory_name) {
 }
 
 function requireMLib(mlib_name, directory_name) {
-  //require('../' + directory_name + '/' + mlib_name);
+  console.log(">>>>> mlib_name: " + mlib_name + ", dir_name: " + directory_name);
+  require('./' + directory_name + '/' + mlib_name);
 }
 
 // library 추가
