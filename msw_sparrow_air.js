@@ -17,6 +17,7 @@
 var mqtt = require('mqtt');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
+var path = require('path');
 
 var my_msw_name = 'msw_sparrow_air';
 
@@ -120,6 +121,9 @@ function git_pull(mlib_name, directory_name) {
 }
 
 function requireMLib(mlib_name, directory_name) {
+  var currDir = path.resolve(process.cwd(), '.');
+  console.log(">>>>> currDir: " + currDir);
+
   console.log(">>>>> mlib_name: " + mlib_name + ", dir_name: " + directory_name);
   require('./' + directory_name + '/' + mlib_name);
 }
