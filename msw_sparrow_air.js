@@ -130,21 +130,22 @@ function initMSW() {
 // library 추가
 var add_lib = {};
 function addLib() {
-try {
-  add_lib = {};
-  add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + mlib_name + '.json', 'utf8'));
-  config.lib.push(add_lib);
-}
-catch (e) {
-  add_lib = {
+  try {
+    add_lib = {};
+    add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + mlib_name + '.json', 'utf8'));
+    config.lib.push(add_lib);
+  }
+  catch (e) {
+    add_lib = {
       name: ' + mlib_name + ',
       target: 'armv6',
       description: "[name] [portnum] [baudrate]",
       scripts: './' + mlib_name + ' /dev/ttyUSB4 115200',
       data: ['AIR'],
       control: ['Control_AIR']
-  };
-  config.lib.push(add_lib);
+    };
+    config.lib.push(add_lib);
+  }
 }
 
 function init() {
