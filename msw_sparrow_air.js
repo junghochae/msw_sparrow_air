@@ -40,3 +40,306 @@ catch (e) {
   config.lib = [];
 }
 
+config.directory_name = 'lib_sparrow_air';
+const mlib_name = 'lib_sparrow_air';
+const mlib_repository_url = 'https://github.com/IoTKETI/lib_sparrow_air.git';
+
+try {
+  if(fs.existsSync('./' + config.directory_name)) {
+    setTimeout(git_pull, 10, mlib_name, config.directory_name);
+  }
+  else {
+    setTimeout(git_clone, 10, mlib_name, config.directory_name, mlib_repository_url);
+  }
+}
+catch (e) {
+  console.log(e.message);
+}
+
+function git_clone(mlib_name, directory_name, repository_url) {
+  try {
+    require('fs-extra').removeSync('./' + directory_name);
+  }
+  catch (e) {
+    console.log(e.message);
+  }
+
+  var gitClone = spawn('git', ['clone', repository_url, directory_name]);
+
+  gitClone.stdout.on('data', function(data) {
+    console.log('stdout: ' + data);
+  });
+
+  gitClone.stderr.on('data', function(data) {
+    console.log('stderr: ' + data);
+  });
+
+  gitClone.on('exit', function(code) {
+    console.log('exit: ' + code);
+
+    setTimeout(requireMLib, 5000, mlib_name, directory_name);
+  });
+
+  gitClone.on('error', function(code) {
+    console.log('error: ' + code);
+  });
+}
+
+function git_pull(mlib_name, directory_name) {
+  try {
+    if (process.platform === 'win32') {
+      var cmd = 'git'
+    }
+    else {
+      cmd = 'git'
+    }
+
+    var gitPull = spawn(cmd, ['pull'], { cwd: process.cwd() + '/' + directory_name });
+
+    gitPull.stdout.on('data', function(data) {
+      console.log('stdout: ' + data);
+    });
+
+    gitPull.stderr.on('data', function(data) {
+      console.log('stderr: ' + data);
+    });
+
+    gitPull.on('exit', function(code) {
+      console.log('exit: ' + code);
+
+      setTimeout(requireMLib, 1000, mlib_name, directory_name);
+    });
+
+    gitPull.on('error', function(code) {
+      console.log('error: ' + code);
+    });
+  }
+  catch (e) {
+    console.log(e.message);
+  }
+}
+
+// library 추가
+var add_lib = {};
+try {
+  add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + mlib_name + '.json', 'utf8'));
+  config.lib.push(add_lib);
+}
+catch (e) {
+  add_lib = {
+    name: ' + mlib_name + ',
+    target: 'armv6',
+    description: "[name] [portnum] [baudrate]",
+    scripts: './' + mlib_name + ' /dev/ttyUSB4 115200',
+    data: ['AIR'],
+    control: ['Control_AIR']
+  };
+  config.lib.push(add_lib);
+}
+function init() {
+  if(config.lib.length > 0) {
+    for(var idx in config.lib) {
+      if(config.lib.hasOwnProperty(idx)) {
+        if (msw_mqtt_client != null) {
+          for (var i = 0; i < config.lib[idx].control.length; i++) {
+            var sub_container_name = config.lib[idx].control[i];
+            _topic = '/Mobius/' + config.gcs + '/Mission_Data/' + config.drone + '/' + my_msw_name + '/' + sub_container_name;
+            msw_mqtt_client.subscribe(_topic);
+            msw_sub_muv_topic.push(_topic);
+            console.log('[msw_mqtt] msw_sub_muv_topic[' + i + ']: ' + _topic);
+          }
+
+          for (var i = 0; i < config.lib[idx].data.length; i++) {
+            var container_name = config.lib[idx].data[i];
+            var _topic = '/MUV/data/' + config.lib[idx].name + '/' + container_name;
+            msw_mqtt_client.subscribe(_topic);
+            msw_sub_lib_topic.push(_topic);
+            console.log('[lib_mqtt] lib_topic[' + i + ']: ' + _topic);
+          }
+        }
+
+        var obj_lib = config.lib[idx];
+        setTimeout(runLib, 1000 + parseInt(Math.random()*10), JSON.parse(JSON.stringify(obj_lib)));
+      }
+    }
+  }
+}
+
+function runLib(obj_lib) {
+  try {
+    var scripts_arr = obj_lib.scripts.split(' ');
+    if(config.directory_name == '') {
+
+    }
+    else {
+      scripts_arr[0] = scripts_arr[0].replace('./', '');
+      scripts_arr[0] = './' + config.directory_name + '/' + scripts_arr[0];
+    }
+
+    var run_lib = spawn(scripts_arr[0], scripts_arr.slice(1));
+
+    run_lib.stdout.on('data', function(data) {
+      console.log('stdout: ' + data);
+    });
+
+    run_lib.stderr.on('data', function(data) {
+      console.log('stderr: ' + data);
+    });
+
+    run_lib.on('exit', function(code) {
+      console.log('exit: ' + code);
+    });
+
+    run_lib.on('error', function(code) {
+      console.log('error: ' + code);
+    });
+  }
+  catch (e) {
+    console.log(e.message);
+  }
+}
+
+function on_receive_from_muv(topic, str_message) {
+  console.log('[' + topic + '] ' + str_message);
+
+  parseControlMission(topic, str_message);
+}
+
+function on_receive_from_lib(topic, str_message) {
+  console.log('[' + topic + '] ' + str_message);
+
+  parseDataMission(topic, str_message);
+}
+
+function on_process_fc_data(topic, str_message) {
+  var topic_arr = topic.split('/');
+  fc[topic_arr[topic_arr.length-1]] = JSON.parse(str_message.toString());
+
+  parseFcData(topic, str_message);
+}
+
+setTimeout(init, 1000);
+
+// msw가 muv로 부터 트리거를 받는 용도
+// 명세에 sub_container 로 표기
+var msw_sub_muv_topic = [];
+
+var msw_sub_fc_topic = [];
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/heartbeat');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/global_position_int');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/attitude');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/battery_status');
+
+var msw_sub_lib_topic = [];
+
+var msw_mqtt_client = null;
+
+msw_mqtt_connect('localhost', 1883);
+
+function msw_mqtt_connect(broker_ip, port) {
+  if(msw_mqtt_client == null) {
+    var connectOptions = {
+        host: broker_ip,
+        port: port,
+        protocol: "mqtt",
+        keepalive: 10,
+        protocolId: "MQTT",
+        protocolVersion: 4,
+        clean: true,
+        reconnectPeriod: 2000,
+        connectTimeout: 2000,
+        rejectUnauthorized: false
+    };
+
+    msw_mqtt_client = mqtt.connect(connectOptions);
+
+    msw_mqtt_client.on('connect', function () {
+      console.log('[msw_mqtt_connect] connected to ' + broker_ip);
+      for(idx in msw_sub_fc_topic) {
+        if(msw_sub_fc_topic.hasOwnProperty(idx)) {
+          msw_mqtt_client.subscribe(msw_sub_fc_topic[idx]);
+          console.log('[msw_mqtt] msw_sub_fc_topic[' + idx + ']: ' + msw_sub_fc_topic[idx]);
+        }
+      }
+    });
+
+    msw_mqtt_client.on('message', function (topic, message) {
+      for(var idx in msw_sub_muv_topic) {
+        if (msw_sub_muv_topic.hasOwnProperty(idx)) {
+          if(topic == msw_sub_muv_topic[idx]) {
+            setTimeout(on_receive_from_muv, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+
+      for(idx in msw_sub_lib_topic) {
+        if (msw_sub_lib_topic.hasOwnProperty(idx)) {
+          if(topic == msw_sub_lib_topic[idx]) {
+            setTimeout(on_receive_from_lib, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+
+      for(idx in msw_sub_fc_topic) {
+        if (msw_sub_fc_topic.hasOwnProperty(idx)) {
+          if(topic == msw_sub_fc_topic[idx]) {
+            setTimeout(on_process_fc_data, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+    });
+
+    msw_mqtt_client.on('error', function (err) {
+      console.log(err.message);
+    });
+  }
+}
+// 유저 디파인 미션 소프트웨어 기능
+//////////////////////////////////////////////////////////////////////////////
+function parseDataMission(topic, str_message) {
+  try {
+    // User define Code
+    var obj_lib_data = JSON.parse(str_message);
+    if(fc.hasOwnProperty('global_position_int')) {
+      Object.assign(obj_lib_data, JSON.parse(JSON.stringify(fc['global_position_int'])));
+    }
+    str_message = JSON.stringify(obj_lib_data);
+
+    ///////////////////////////////////////////////////////////////////////
+
+    var topic_arr = topic.split('/');
+    var data_topic = '/Mobius/' + config.gcs + '/Mission_Data/' + config.drone + '/' + config.name + '/' + topic_arr[topic_arr.length-1];
+    msw_mqtt_client.publish(data_topic + '/' + my_sortie_name, str_message);
+  }
+  catch (e) {
+    console.log('[parseDataMission] data format of lib is not json');
+  }
+}
+///////////////////////////////////////////////////////////////////////////////
+
+function parseControlMission(topic, str_message) {
+  try {
+    // User define Code
+    ///////////////////////////////////////////////////////////////////////
+
+    var topic_arr = topic.split('/');
+    var _topic = '/MUV/control/' + config.lib[0].name + '/' + topic_arr[topic_arr.length - 1];
+    msw_mqtt_client.publish(_topic, str_message);
+  }
+  catch (e) {
+    console.log('[parseDataMission] data format of lib is not json');
+  }
+}
+
+function parseFcData(topic, str_message) {
+  // User define Code
+  // var topic_arr = topic.split('/');
+  // if(topic_arr[topic_arr.length-1] == 'global_position_int') {
+    // var _topic = '/MUV/control/' + config.lib[0].name + '/' + config.lib[1].control[1];
+    // msw_mqtt_client.publish(_topic, str_message);
+  // }
+  ///////////////////////////////////////////////////////////////////////
+}
