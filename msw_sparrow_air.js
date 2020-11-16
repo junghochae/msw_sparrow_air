@@ -138,6 +138,7 @@ catch (e) {
     data: ['AIR'],
     control: ['Control_AIR']
   };
+  console.log(add_lib);
   config.lib.push(add_lib);
 }
 function init() {
