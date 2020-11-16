@@ -78,7 +78,7 @@ function git_clone(mlib_name, directory_name, repository_url) {
   gitClone.on('exit', function(code) {
     console.log('exit: ' + code);
 
-    setTimeout(requireMLib, 5000, mlib_name, directory_name);
+    //setTimeout(requireMLib, 5000, mlib_name, directory_name);
   });
 
   gitClone.on('error', function(code) {
@@ -108,7 +108,7 @@ function git_pull(mlib_name, directory_name) {
     gitPull.on('exit', function(code) {
       console.log('exit: ' + code);
 
-      setTimeout(requireMLib, 1000, mlib_name, directory_name);
+      //setTimeout(requireMLib, 1000, mlib_name, directory_name);
     });
 
     gitPull.on('error', function(code) {
