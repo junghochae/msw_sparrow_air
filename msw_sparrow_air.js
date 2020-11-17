@@ -17,7 +17,6 @@
 var mqtt = require('mqtt');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
-var path = require('path');
 
 var my_msw_name = 'msw_sparrow_air';
 
@@ -78,7 +77,7 @@ function git_clone(mlib_name, directory_name, repository_url) {
   gitClone.on('exit', function(code) {
     console.log('exit: ' + code);
 
-    setTimeout(initMSW, 1000);
+    setTimeout(requireMLib, 5000);
   });
 
   gitClone.on('error', function(code) {
@@ -108,7 +107,7 @@ function git_pull(mlib_name, directory_name) {
     gitPull.on('exit', function(code) {
       console.log('exit: ' + code);
 
-      setTimeout(initMSW, 1000);
+      setTimeout(requireMLib, 1000);
     });
 
     gitPull.on('error', function(code) {
@@ -120,16 +119,14 @@ function git_pull(mlib_name, directory_name) {
   }
 }
 
-// git clone/pull 이후 실행
-function initMSW() {
+function requireMLib() {
   addLib();
   init();
 }
 
-
 // library 추가
-var add_lib = {};
 function addLib() {
+  var add_lib = {};
   try {
     add_lib = {};
     add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + mlib_name + '.json', 'utf8'));
@@ -147,7 +144,6 @@ function addLib() {
     config.lib.push(add_lib);
   }
 }
-
 function init() {
   if(config.lib.length > 0) {
     for(var idx in config.lib) {
@@ -196,20 +192,14 @@ function runLib(obj_lib) {
 
     run_lib.stderr.on('data', function(data) {
       console.log('stderr: ' + data);
-
-      setTimeout(init, 1000);
     });
 
     run_lib.on('exit', function(code) {
       console.log('exit: ' + code);
- 
-      setTimeout(init, 1000);
     });
 
     run_lib.on('error', function(code) {
       console.log('error: ' + code);
-
-      setTimeout(init, 1000);
     });
   }
   catch (e) {
