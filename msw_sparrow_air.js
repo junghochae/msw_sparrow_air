@@ -307,7 +307,7 @@ function msw_mqtt_connect(broker_ip, port) {
 function parseDataMission(topic, str_message) {
   try {
 data #1
-xxx  
+x1  
 }
   catch (e) {
     console.log('[parseDataMission] data format of lib is not json');
@@ -318,7 +318,7 @@ xxx
 function parseControlMission(topic, str_message) {
   try {
 data #2
-yyy  
+y1  
 }
   catch (e) {
     console.log('[parseDataMission] data format of lib is not json');
@@ -327,5 +327,5 @@ yyy
 
 function parseFcData(topic, str_message) {
 data #3
-zzz
+z1
 }
