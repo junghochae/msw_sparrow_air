@@ -1,1 +1,1 @@
-{"name":"lib_sparrow_air","target":"armv6","description":"[name] [portnum] [baudrate]","scripts":"./lib_sparrow_air /dev/ttyUSB3 115200","data":["AIR"],"control":["Control_AIR"]}
+{"name":"lib_sparrow_air","target":"armv6","description":"[name] [portnum] [baudrate]","scripts":"./lib_sparrow_air /dev/ttyUSB1 115200","data":["AIR"],"control":["Control_AIR"]}
