@@ -40,9 +40,9 @@ catch (e) {
   config.lib = [];
 }
 
-config.directory_name = ',';
-const mlib_name = ',';
-const mlib_repository_url = ',';
+config.directory_name = 'lib_sparrow_air';
+const mlib_name = 'lib_sparrow_air';
+const mlib_repository_url = 'https://github.com/IoTKETI/lib_sparrow_air.git';
 
 try {
   if(fs.existsSync('./' + config.directory_name)) {
