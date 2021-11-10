@@ -14,25 +14,42 @@
 
 // for TAS of mission
 
-var mqtt = require('mqtt');
-var fs = require('fs');
-var spawn = require('child_process').spawn;
+let mqtt = require('mqtt');
+let fs = require('fs');
+let spawn = require('child_process').spawn;
 
-var my_msw_name = 'msw_sync_test';
+let my_msw_name = 'msw_sync_test';
 
-var fc = {};
-var config = {};
+let fc = {};
+let config = {};
+
+let sortie_name
+try {
+  sortie_name = my_sortie_name
+}
+catch(e) {
+  sortie_name = process.argv[2]
+}
 
 config.name = my_msw_name;
 
 try {
-  config.directory_name = msw_directory[my_msw_name];
-  config.sorite_name = '/' + my_sortie_name;
-  config.gcs = drone_info.gcs;
-  config.drone = drone_info.drone;
-  config.lib = [];
+  try {    // for nCube-MUV (NodeJs)
+    config.directory_name = msw_directory[my_msw_name];
+    config.sortie_name = '/' + sortie_name;
+    config.gcs = drone_info.gcs;
+    config.drone = drone_info.drone;
+    config.lib = [];
+  }
+  catch (e) {    // for nCube-MUV-Python
+    config.directory_name = process.argv[3];
+    config.sortie_name = '/' + sortie_name;
+    config.gcs = process.argv[4];
+    config.drone = process.argv[5];
+    config.lib = [];
+  }
 }
-catch (e) {
+catch(e) {
   config.sortie_name = '';
   config.directory_name = '';
   config.gcs = 'KETI_MUV';
@@ -40,77 +57,80 @@ catch (e) {
   config.lib = [];
 }
 
-config.directory_name = 'lib_sparrow_air';
-const mlib_name = 'lib_sparrow_air';
-const mlib_repository_url = 'https://github.com/IoTKETI/lib_sparrow_air.git';
-
+// library 추가
+let add_lib = {};
 try {
-  if(fs.existsSync('./' + config.directory_name)) {
-    setTimeout(git_pull, 10, mlib_name, config.directory_name);
-  }
-  else {
-    setTimeout(git_clone, 10, mlib_name, config.directory_name, mlib_repository_url);
-  }
+  add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + lib_kt_lte + '.json', 'utf8'));
+  config.lib.push(add_lib);
 }
 catch (e) {
-  console.log(e.message);
+  add_lib = {
+    name: 'lib_devtool_test',
+    target: 'armv6',
+    description: "[name] [portnum] [baudrate]",
+    scripts: './lib_devtool_test /dev/ttyUSB4 115200',
+    data: ['Test'],
+    control: ['Control_Test']
+  };
+  config.lib.push(add_lib);
+}
+function init() {
+  if(config.lib.length > 0) {
+    for(let idx in config.lib) {
+      if(config.lib.hasOwnProperty(idx)) {
+        if (msw_mqtt_client != null) {
+          for (let i = 0; i < config.lib[idx].control.length; i++) {
+            let sub_container_name = config.lib[idx].control[i];
+            let_topic = '/Mobius/' + config.gcs + '/Mission_Data/' + config.drone + '/' + my_msw_name + '/' + sub_container_name;
+            msw_mqtt_client.subscribe(_topic);
+            msw_sub_muv_topic.push(_topic);
+            console.log('[msw_mqtt] msw_sub_muv_topic[' + i + ']: ' + _topic);
+          }
+
+          for (let i = 0; i < config.lib[idx].data.length; i++) {
+            let container_name = config.lib[idx].data[i];
+            let _topic = '/MUV/data/' + config.lib[idx].name + '/' + container_name;
+            msw_mqtt_client.subscribe(_topic);
+            msw_sub_lib_topic.push(_topic);
+            console.log('[lib_mqtt] lib_topic[' + i + ']: ' + _topic);
+          }
+        }
+
+        let obj_lib = config.lib[idx];
+        setTimeout(runLib, 1000 + parseInt(Math.random()*10), JSON.parse(JSON.stringify(obj_lib)));
+      }
+    }
+  }
 }
 
-function git_clone(mlib_name, directory_name, repository_url) {
+function runLib(obj_lib) {
   try {
-    require('fs-extra').removeSync('./' + directory_name);
-  }
-  catch (e) {
-    console.log(e.message);
-  }
+    let scripts_arr = obj_lib.scripts.split(' ');
+    if(config.directory_name == '') {
 
-  var gitClone = spawn('git', ['clone', repository_url, directory_name]);
-
-  gitClone.stdout.on('data', function(data) {
-    console.log('stdout: ' + data);
-  });
-
-  gitClone.stderr.on('data', function(data) {
-    console.log('stderr: ' + data);
-  });
-
-  gitClone.on('exit', function(code) {
-    console.log('exit: ' + code);
-
-    setTimeout(requireMLib, 5000);
-  });
-
-  gitClone.on('error', function(code) {
-    console.log('error: ' + code);
-  });
-}
-
-function git_pull(mlib_name, directory_name) {
-  try {
-    if (process.platform === 'win32') {
-      var cmd = 'git'
     }
     else {
-      cmd = 'git'
+      scripts_arr[0] = scripts_arr[0].replace('./', '');
+      scripts_arr[0] = './' + config.directory_name + '/' + scripts_arr[0];
     }
 
-    var gitPull = spawn(cmd, ['pull'], { cwd: process.cwd() + '/' + directory_name });
+    let run_lib = spawn(scripts_arr[0], scripts_arr.slice(1));
 
-    gitPull.stdout.on('data', function(data) {
+    run_lib.stdout.on('data', function(data) {
       console.log('stdout: ' + data);
     });
 
-    gitPull.stderr.on('data', function(data) {
+    run_lib.stderr.on('data', function(data) {
       console.log('stderr: ' + data);
     });
 
-    gitPull.on('exit', function(code) {
+    run_lib.on('exit', function(code) {
       console.log('exit: ' + code);
 
-      setTimeout(requireMLib, 1000);
+      setTimeout(runLib, 2000, obj_lib);
     });
 
-    gitPull.on('error', function(code) {
+    run_lib.on('error', function(code) {
       console.log('error: ' + code);
     });
   }
@@ -119,62 +139,131 @@ function git_pull(mlib_name, directory_name) {
   }
 }
 
-function requireMLib() {
-  addLib();
-  init();
+function on_receive_from_muv(topic, str_message) {
+  console.log('[' + topic + '] ' + str_message);
+
+  parseControlMission(topic, str_message);
 }
 
-// library 추가
-function addLib() {
-  var add_lib = {};
+function on_receive_from_lib(topic, str_message) {
+  console.log('[' + topic + '] ' + str_message + '\n');
+
+  parseDataMission(topic, str_message);
+}
+
+function on_process_fc_data(topic, str_message) {
+  console.log('[' + topic + '] ' + str_message + '\n');
+
+  let topic_arr = topic.split('/');
   try {
-    add_lib = {};
-    add_lib = JSON.parse(fs.readFileSync('./' + config.directory_name + '/' + mlib_name + '.json', 'utf8'));
-    config.lib.push(add_lib);
+    fc[topic_arr[topic_arr.length-1]] = JSON.parse(str_message.toString());
+
   }
   catch (e) {
-    add_lib = {
-      name: ' + mlib_name + ',
-      target: 'armv6',
-      description: "[name] [portnum] [baudrate]",
-      scripts: './' + mlib_name + ' /dev/ttyUSB3 115200',
-      data: ['AIR'],
-      control: ['Control_AIR']
+  }
+
+  parseFcData(topic, str_message);
+}
+
+setTimeout(init, 1000);
+
+// msw가 muv로 부터 트리거를 받는 용도
+// 명세에 sub_container 로 표기
+let msw_sub_muv_topic = [];
+
+let msw_sub_lib_topic = [];
+
+let msw_sub_fc_topic = [];
+
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/heartbeat');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/global_position_int');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/attitude');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/battery_status');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/system_time');
+msw_sub_fc_topic.push('/Mobius/' + config.gcs + '/Drone_Data/' + config.drone + '/timesync');
+let msw_mqtt_client = null;
+
+msw_mqtt_connect('localhost', 1883);
+
+function msw_mqtt_connect(broker_ip, port) {
+  if(msw_mqtt_client == null) {
+    let connectOptions = {
+        host: broker_ip,
+        port: port,
+        protocol: "mqtt",
+        keepalive: 10,
+        protocolId: "MQTT",
+        protocolVersion: 4,
+        clean: true,
+        reconnectPeriod: 2000,
+        connectTimeout: 2000,
+        rejectUnauthorized: false
     };
-    config.lib.push(add_lib);
+
+    msw_mqtt_client = mqtt.connect(connectOptions);
+
+    msw_mqtt_client.on('connect', function () {
+      console.log('[msw_mqtt_connect] connected to ' + broker_ip);
+      for(let idx in msw_sub_fc_topic) {
+        if(msw_sub_fc_topic.hasOwnProperty(idx)) {
+          msw_mqtt_client.subscribe(msw_sub_fc_topic[idx]);
+          console.log('[msw_mqtt] msw_sub_fc_topic[' + idx + ']: ' + msw_sub_fc_topic[idx]);
+        }
+      }
+    });
+
+    msw_mqtt_client.on('message', function (topic, message) {
+      for(let idx in msw_sub_muv_topic) {
+        if (msw_sub_muv_topic.hasOwnProperty(idx)) {
+          if(topic === msw_sub_muv_topic[idx]) {
+            setTimeout(on_receive_from_muv, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+
+      for(idx in msw_sub_lib_topic) {
+        if (msw_sub_lib_topic.hasOwnProperty(idx)) {
+          if(topic == msw_sub_lib_topic[idx]) {
+            setTimeout(on_receive_from_lib, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+
+      for(idx in msw_sub_fc_topic) {
+        if (msw_sub_fc_topic.hasOwnProperty(idx)) {
+          if(topic == msw_sub_fc_topic[idx]) {
+            setTimeout(on_process_fc_data, parseInt(Math.random() * 5), topic, message.toString());
+            break;
+          }
+        }
+      }
+    });
+
+    msw_mqtt_client.on('error', function (err) {
+      console.log(err.message);
+    });
   }
 }
 // 유저 디파인 미션 소프트웨어 기능
 //////////////////////////////////////////////////////////////////////////////
 function parseDataMission(topic, str_message) {
   try {
-    // User Define Code
-    var obj_lib_data = JSON.parse(str_message);
-    if(fc.hasOwnProperty('global_position_int')) {
-      Object.assign(obj_lib_data, JSON.parse(JSON.stringify(fc['global_position_int'])));
+    let topic_arr = topic.split('/');
+    if (topic_arr[topic_arr.length - 1] === config.lib[0].data[0]) {
+
+      let data_topic = '/Mobius/' + config.gcs + '/Mission_Data/' + config.drone + '/' + config.name + '/' + topic_arr[topic_arr.length - 1];
+      msw_mqtt_client.publish(data_topic, str_message);
     }
-
-    if(fc.hasOwnProperty('heartbeat')) {
-      Object.assign(obj_lib_data, JSON.parse(JSON.stringify(fc['heartbeat'])));
+    else if (topic_arr[topic_arr.length - 1] === config.lib[0].data[1]) {
+      if (mavPort != null) {
+        if (mavPort.isOpen) {
+          mavPort.write(Buffer.from(str_message, 'hex'))
+        }
+      }
     }
-
-    if(fc.hasOwnProperty('attitude')) {
-      Object.assign(obj_lib_data, JSON.parse(JSON.stringify(fc['attitude'])));
-    }
-
-    if(fc.hasOwnProperty('battery_status')) {
-      Object.assign(obj_lib_data, JSON.parse(JSON.stringify(fc['battery_status'])));
-    }
-
-    str_message = JSON.stringify(obj_lib_data);
-    ///////////////////////////////////////////
-
-    var topic_arr = topic.split('/');
-    let data_topic = '/Mobius/' + config.gcs + '/Mission_Data/' + config.drone + '/' + config.name + '/' + topic_arr[topic_arr.length - 1];
-    msw_mqtt_client.publish(data_topic + '/' + sortie_name,, str_message);
-
-  
-}
+  }
   catch (e) {
     console.log('[parseDataMission] data format of lib is not json');
   }
@@ -183,8 +272,8 @@ function parseDataMission(topic, str_message) {
 
 function parseControlMission(topic, str_message) {
   try {
-    var topic_arr = topic.split('/');
-    var _topic = '/MUV/control' + config.lib[0].name + '/' + topic_arr[topic_arr.length - 1];
+    let topic_arr = topic.split('/');
+    let _topic = '/MUV/control/' + config.lib[0].name + '/' + topic_arr[topic_arr.length - 1];
     msw_mqtt_client.publish(_topic, str_message);
   
 }
@@ -194,10 +283,15 @@ function parseControlMission(topic, str_message) {
 }
 
 function parseFcData(topic, str_message) {
-  var topic_arr = topic.split('/');
-  if(topic_arr[topic_arr.length-1] == 'global_position_int') {
-    var _topic = '/MUV/control' + config.lib[0].name + '/' + config.lib[1].control[1];
+  let topic_arr = topic.split('/');
+  if(topic_arr[topic_arr.length-1] === 'system_time') {
+    let _topic = '/MUV/control/' + config.lib[0].name + '/' + config.lib[0].control[0]; // 'system_time'
     msw_mqtt_client.publish(_topic, str_message);
+  }
+  else if (topic_arr[topic_arr.length-1] === 'timesync') {
+    let _topic = '/MUV/control/' + config.lib[0].name + '/' + config.lib[0].control[1]; // 'timesync'
+  }
+  else {
   }
 
 
