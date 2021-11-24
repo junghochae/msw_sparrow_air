@@ -57,6 +57,89 @@ catch(e) {
   config.lib = [];
 }
 
+config.directory_name = 'lib_bz_cargo';
+const mlib_name = 'lib_bz_cargo';
+const mlib_repository_url = 'https://github.com/IoTKETI/lib_bz_cargo.git';
+
+try {
+  if(fs.existsSync('./' + config.directory_name)) {
+    setTimeout(git_pull, 10, mlib_name, config.directory_name);
+  }
+  else {
+    setTimeout(git_clone, 10, mlib_name, config.directory_name, mlib_repository_url);
+  }
+}
+catch (e) {
+  console.log(e.message);
+}
+
+function git_clone(mlib_name, directory_name, repository_url) {
+  try {
+    require('fs-extra').removeSync('./' + directory_name);
+  }
+  catch (e) {
+    console.log(e.message);
+  }
+
+  var gitClone = spawn('git', ['clone', repository_url, directory_name]);
+
+  gitClone.stdout.on('data', function(data) {
+    console.log('stdout: ' + data);
+  });
+
+  gitClone.stderr.on('data', function(data) {
+    console.log('stderr: ' + data);
+  });
+
+  gitClone.on('exit', function(code) {
+    console.log('exit: ' + code);
+
+    setTimeout(requireMLib, 5000);
+  });
+
+  gitClone.on('error', function(code) {
+    console.log('error: ' + code);
+  });
+}
+
+function git_pull(mlib_name, directory_name) {
+  try {
+    if (process.platform === 'win32') {
+      var cmd = 'git'
+    }
+    else {
+      cmd = 'git'
+    }
+
+    var gitPull = spawn(cmd, ['pull'], { cwd: process.cwd() + '/' + directory_name });
+
+    gitPull.stdout.on('data', function(data) {
+      console.log('stdout: ' + data);
+    });
+
+    gitPull.stderr.on('data', function(data) {
+      console.log('stderr: ' + data);
+    });
+
+    gitPull.on('exit', function(code) {
+      console.log('exit: ' + code);
+
+      setTimeout(requireMLib, 1000);
+    });
+
+    gitPull.on('error', function(code) {
+      console.log('error: ' + code);
+    });
+  }
+  catch (e) {
+    console.log(e.message);
+  }
+}
+
+function requireMLib() {
+  addLib();
+  init();
+}
 // library 추가
 let add_lib = {};
 try {
